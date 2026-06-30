@@ -1,0 +1,117 @@
+import bpy
+
+# =========================
+# パラメータ（mm）
+# =========================
+
+BOARD_W = 150.0
+BOARD_H = 170.0
+BOARD_T = 5.0
+
+HOLE_D = 3.0
+HOLE_R = HOLE_D / 2.0
+
+# 左下原点(x, y) [mm]
+holes_mm = [
+
+    # 左上 4穴
+    (10, 160),
+    (70, 160),
+    (10, 100),
+    (70, 100),
+
+    # モーター固定 2穴
+    (10, 33),
+    (70, 33),
+
+    # 右下 3穴
+    (120, 20),
+    (125, 20),
+    (130, 20),
+
+    # 右上 3穴
+    (120, 60),
+    (125, 60),
+    (130, 60),
+]
+
+MM = 0.001
+
+
+# =========================
+# 既存オブジェクト削除
+# =========================
+
+bpy.ops.object.select_all(action='SELECT')
+bpy.ops.object.delete(use_global=False)
+
+
+# =========================
+# 板作成
+# =========================
+
+bpy.ops.mesh.primitive_cube_add(
+    location=(0, 0, BOARD_T * MM / 2)
+)
+
+board = bpy.context.object
+board.name = "MountPlate"
+
+board.scale = (
+    BOARD_W * MM / 2,
+    BOARD_H * MM / 2,
+    BOARD_T * MM / 2
+)
+
+
+# =========================
+# 穴用オブジェクト作成
+# =========================
+
+cutters = []
+
+for i, (x_mm, y_mm) in enumerate(holes_mm):
+
+    # 左下原点 → 中心原点
+    x = (x_mm - BOARD_W / 2) * MM
+    y = (y_mm - BOARD_H / 2) * MM
+
+    bpy.ops.mesh.primitive_cylinder_add(
+        vertices=64,
+        radius=HOLE_R * MM,
+        depth=(BOARD_T + 2) * MM,
+        location=(x, y, BOARD_T * MM / 2)
+    )
+
+    cutter = bpy.context.object
+    cutter.name = f"Hole_{i:02d}"
+
+    cutters.append(cutter)
+
+
+# =========================
+# Boolean適用
+# =========================
+
+for cutter in cutters:
+
+    mod = board.modifiers.new(
+        name=f"Bool_{cutter.name}",
+        type='BOOLEAN'
+    )
+
+    mod.operation = 'DIFFERENCE'
+    mod.object = cutter
+    mod.solver = 'EXACT'
+
+    bpy.context.view_layer.objects.active = board
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+
+    bpy.data.objects.remove(cutter, do_unlink=True)
+
+
+# =========================
+# 完了
+# =========================
+
+print("150x170x5 mm プレート作成完了")
